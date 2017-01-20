@@ -1,0 +1,47 @@
+TOTAL PLAN:
+
+
+
+Room By Room:
+
+
+Garage:
+-------
+
+ - Sensor for Garage door (B&D DOOR)
+ 	-- 3 statuses
+	--- Door Open
+	--- Door Close - No Car
+	--- Door Close - Car
+	- Button to Open Door
+	- Software Button to Open Door (Mqtt)
+	- Temp Sensor / Humidity Sensor
+	- Light Sensor (is the main light on) 
+
+
+Living Areas:
+------------
+	- Temp Sensors
+	- Airconditionin 
+		-- On
+		-- Off
+		-- Set Temp
+		-- Set Zone
+		-- Set Fan Speed
+	- Light Sensors
+
+Upstairs:
+---------
+	- Motorised Blinds
+		-- Down
+		-- Up
+		-- Charge?
+
+
+
+General Household:
+------------------
+	- Power Consumption
+	- Water Level (dogs bowl)
+	- Food Level (dogs bowl)
+

@@ -1,25 +1,20 @@
 /**
- * HC-SR04 Demo
- * Demonstration of the HC-SR04 Ultrasonic Sensor
- * Date: August 3, 2016
- * 
- * Description:
- *  Connect the ultrasonic sensor to the Arduino as per the
- *  hardware connections below. Run the sketch and open a serial
- *  monitor. The distance read from the sensor will be displayed
- *  in centimeters and inches.
- * 
- * Hardware Connections:
- *  Arduino | HC-SR04 
- *  -------------------
- *    5V    |   VCC     
- *    7     |   Trig     
- *    8     |   Echo     
- *    GND   |   GND
- *  
- * License:
- *  Public Domain
+ * Garage Door Opener / 
  */
+
+#include <EtherCard.h>
+
+#define REQUEST_RATE 5000 // milliseconds
+
+// ethernet interface mac address
+static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
+// ethernet interface ip address
+static byte myip[] = { 192,168,0,210 };
+// gateway ip address
+static byte gwip[] = { 192,168,0,1 };
+
+byte Ethernet::buffer[500];   // a very small tcp/ip buffer is enough here
+static long timer;
 
 // Pins
 const int TRIG_PIN = 7;
@@ -28,12 +23,23 @@ const int ECHO_PIN = 8;
 // Anything over 400 cm (23200 us pulse) is "out of range"
 const unsigned int MAX_DIST = 23200;
 
+
+
 void setup() {
   // The Trigger pin will tell the sensor to range find
   pinMode(TRIG_PIN, OUTPUT);
   digitalWrite(TRIG_PIN, LOW);
   // We'll use the serial monitor to view the sensor output
   Serial.begin(9600);
+
+  if (ether.begin(sizeof Ethernet::buffer, mymac) == 0) 
+    Serial.println( "Failed to access Ethernet controller");
+
+  ether.staticSetup(myip, gwip);
+
+  timer = - REQUEST_RATE; // start timing out right away
+  
+  Serial.println("Beginning Application");
 }
 
 
@@ -44,6 +50,7 @@ void loop() {
   unsigned long pulse_width;
   float cm;
   float inches;
+  ether.packetLoop(ether.packetReceive());
   // Hold the trigger pin high for at least 10 us
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10000);

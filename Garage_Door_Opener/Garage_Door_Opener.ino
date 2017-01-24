@@ -1,62 +1,98 @@
-/**
- * Garage Door Opener / 
- */
+/*
+  Garage Door
+  
+  This deals with 
+    + ethernet connections
+    + MQTT
+    + 
+*/
 
-#include <EtherCard.h>
+#include <SPI.h>
+#include <Ethernet.h>
+#include <PubSubClient.h>
 
-#define REQUEST_RATE 5000 // milliseconds
+// Update these with values suitable for your network.
+byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
+IPAddress ip(192,168,0,201);
+IPAddress server(192,168,0,254);
 
-// ethernet interface mac address
-static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
-// ethernet interface ip address
-static byte myip[] = { 192,168,0,210 };
-// gateway ip address
-static byte gwip[] = { 192,168,0,1 };
-
-byte Ethernet::buffer[500];   // a very small tcp/ip buffer is enough here
-static long timer;
-
-// Pins
+// Ultrasonic Pins
 const int TRIG_PIN = 7;
 const int ECHO_PIN = 8;
 
 // Anything over 400 cm (23200 us pulse) is "out of range"
 const unsigned int MAX_DIST = 23200;
 
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i=0;i<length;i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+}
 
+EthernetClient ethClient;
+PubSubClient client(ethClient);
 
-void setup() {
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect("arduinoClient")) {
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+      client.publish("house/garage/carstate","hello world");
+      // ... and resubscribe
+      client.subscribe("inTopic");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void setup()
+{
+  Serial.begin(57600);
+
+  client.setServer(server, 1883);
+  client.setCallback(callback);
+
+  Ethernet.begin(mac, ip);
+  // Allow the hardware to sort itself out
+  delay(1500);
+  
   // The Trigger pin will tell the sensor to range find
   pinMode(TRIG_PIN, OUTPUT);
   digitalWrite(TRIG_PIN, LOW);
-  // We'll use the serial monitor to view the sensor output
-  Serial.begin(9600);
-
-  if (ether.begin(sizeof Ethernet::buffer, mymac) == 0) 
-    Serial.println( "Failed to access Ethernet controller");
-
-  ether.staticSetup(myip, gwip);
-
-  timer = - REQUEST_RATE; // start timing out right away
-  
-  Serial.println("Beginning Application");
 }
 
-
-
-void loop() {
+void loop()
+{
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+  //
+  // Distance stuff....
+  // 
   unsigned long t1;
   unsigned long t2;
   unsigned long pulse_width;
   float cm;
   float inches;
-  ether.packetLoop(ether.packetReceive());
   // Hold the trigger pin high for at least 10 us
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10000);
   digitalWrite(TRIG_PIN, LOW);
-  // Wait for pulse on echo pin
-  while ( digitalRead(ECHO_PIN) == 0 );
+  // Wait for pulse on echo pin  
+  while (digitalRead(ECHO_PIN) == 0);
   // Measure how long the echo pin was held high (pulse width)
   // Note: the micros() counter will overflow after ~70 min
   t1 = micros();
@@ -76,21 +112,21 @@ void loop() {
     Serial.print(cm);
     Serial.print(" cm \t");    
     Serial.println( "Door Open");
+    client.publish("house/garage/doorstate","open");
+    //client.publish("house/garage/carstate","open");
   } else if ( inches > 6 && inches < 50 ) {
     Serial.print(cm);
     Serial.print(" cm \t");
     Serial.println ( "Door Closed - Car in" );
+    client.publish("house/garage/doorstate","closed");
+    client.publish("house/garage/carstate","in");
   } else {
     Serial.print(cm);
     Serial.print(" cm \t");
     Serial.println("Door Closed - Car out" );
-  /*
-    Serial.print(cm);f
-    Serial.print(" cm \t");
-    Serial.print(inches);
-    Serial.println(" in");
-   */
+    client.publish("house/garage/doorstate","closed");
+    client.publish("house/garage/carstate","out");
   }
-  // Wait at least 60ms before next measurement
-  delay(600);
+  //client.publish("house/garage/carstate","hi");
+  delay(5000);
 }

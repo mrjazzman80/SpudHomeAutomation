@@ -17,21 +17,14 @@ IPAddress ip(192,168,0,201);
 IPAddress server(192,168,0,254);
 
 // Ultrasonic Pins
-const int TRIG_PIN = 7;
-const int ECHO_PIN = 8;
+const int TRIG_PIN = 8;
+const int ECHO_PIN = 7;
+const int RELAY_PIN = 2;
 
 // Anything over 400 cm (23200 us pulse) is "out of range"
 const unsigned int MAX_DIST = 23200;
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i=0;i<length;i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-}
+char message_buff[80];
+int curState = 0;
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);
@@ -44,9 +37,8 @@ void reconnect() {
     if (client.connect("arduinoClient")) {
       Serial.println("connected");
       // Once connected, publish an announcement...
-      client.publish("house/garage/carstate","hello world");
       // ... and resubscribe
-      client.subscribe("inTopic");
+      client.subscribe("house/garage/door/control");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -60,7 +52,8 @@ void reconnect() {
 void setup()
 {
   Serial.begin(57600);
-
+  Serial.println("Begin");
+  
   client.setServer(server, 1883);
   client.setCallback(callback);
 
@@ -71,14 +64,18 @@ void setup()
   // The Trigger pin will tell the sensor to range find
   pinMode(TRIG_PIN, OUTPUT);
   digitalWrite(TRIG_PIN, LOW);
+  pinMode(RELAY_PIN, OUTPUT);  
 }
 
 void loop()
 {
+  Serial.println("Loop in");
   if (!client.connected()) {
     reconnect();
   }
+  Serial.println("Before Loop");
   client.loop();
+  Serial.println("After Loop");
   //
   // Distance stuff....
   // 
@@ -106,27 +103,58 @@ void loop()
   inches = pulse_width / 148.0;
 
   // Print out results
+  Serial.print("Distance ");
+  Serial.println(inches);
   if ( pulse_width > MAX_DIST ) {
-    //Serial.println("Out of range");
-  } else if ( inches < 6 ) {
-    Serial.print(cm);
-    Serial.print(" cm \t");    
-    Serial.println( "Door Open");
-    client.publish("house/garage/doorstate","open");
-    //client.publish("house/garage/carstate","open");
+    Serial.println("Out of range");
+  } else if ( inches <= 6 ) {
+    if ( curState != 1 ) { 
+      client.publish("house/garage/doorstate","open");
+      curState = 1;
+    } // don't publish unlress required
   } else if ( inches > 6 && inches < 50 ) {
-    Serial.print(cm);
-    Serial.print(" cm \t");
-    Serial.println ( "Door Closed - Car in" );
-    client.publish("house/garage/doorstate","closed");
-    client.publish("house/garage/carstate","in");
+    if ( curState != 2 ) { 
+      client.publish("house/garage/doorstate","closed");
+      client.publish("house/garage/carstate","in");
+      curState = 2;
+    } // don't publish unless required
   } else {
-    Serial.print(cm);
-    Serial.print(" cm \t");
-    Serial.println("Door Closed - Car out" );
-    client.publish("house/garage/doorstate","closed");
-    client.publish("house/garage/carstate","out");
+    if ( curState != 3 ) { 
+      client.publish("house/garage/doorstate","closed");
+      client.publish("house/garage/carstate","out");
+      curState = 3;
+    } // don't publish unless required
   }
-  //client.publish("house/garage/carstate","hi");
-  delay(5000);
+  // 100ms for response times..
+  delay(100);
 }
+
+
+
+// handles message arrived on subscribed topic(s)
+void callback(char* topic, byte* payload, unsigned int length) {
+//  Serial.println("INLOOP");
+  int i = 0;
+  for(i=0; i<length; i++) {
+    message_buff[i] = payload[i];
+  }
+  message_buff[i] = '\0';
+  String msgString = String(message_buff);
+  
+  if (msgString == "ON" || msgString == "OFF" ) { 
+     // Place holder for later, this is where
+     // sensor code + relay to enable sensor would go
+     // for state.
+    digitalWrite(RELAY_PIN, HIGH);  
+    Serial.println ("ON");
+    delay(100);
+    digitalWrite(RELAY_PIN, LOW);  
+    Serial.println ("OFF");
+    
+  };
+
+//  Serial.println(msgString);
+  //  client.publish("house/garage/door/control", message_buff);
+  
+
+} // Callback

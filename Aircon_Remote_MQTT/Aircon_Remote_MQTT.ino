@@ -13,25 +13,14 @@
 #include <IRremote.h>
 
 // Update these with values suitable for your network.
-byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
-IPAddress ip(192,168,0,202);
+byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xEF };
+IPAddress ip(192,168,0,203);
 IPAddress server(192,168,0,254);
 IRsend irsend;
 
 // Variables
-char message_buff[100];
+char message_buff[80];
 
-/* 
-  * void callback(char* topic, byte* payload, unsigned int length) {
-  *  Serial.print("Message arrived [");
-  *  Serial.print(topic);
-  *  Serial.print("] ");
-  *  for (int i=0;i<length;i++) {
-  *    Serial.print((char)payload[i]);
-  *  } 
-  *  Serial.println();
-  * }
-  */
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);
@@ -60,13 +49,17 @@ void reconnect() {
 void setup()
 {
   Serial.begin(57600);
-
-  client.setServer(server, 1883);
-  client.setCallback(callback);
+  Serial.println("Starting application");
 
   Ethernet.begin(mac, ip);
   // Allow the hardware to sort itself out
   delay(1500);
+  
+  Serial.println("Network initialised");
+  
+  // Now that we have a network, try the MSQTT stuff
+  client.setServer(server, 1883);
+  client.setCallback(callback);
 }
 
 void loop()
@@ -76,10 +69,6 @@ void loop()
   }
   client.loop();
   // house/upstairs/aircon/response
-  
-
-
-  // IRsend irsend;
   
 }
 
